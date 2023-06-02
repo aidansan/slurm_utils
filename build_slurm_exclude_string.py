@@ -64,8 +64,7 @@ def parse_mem_string(s):
 def filter_gpu_mem(data, amount):
     names = []
     for row in data:
-        # NOTE: LESS THAN BECAUSE WE ARE DOING INVERSE
-        if parse_mem_string(row['GPU RAM (GB)']) < amount and row['GPUs'] and int(row['GPUs']) > 0:
+        if parse_mem_string(row['GPU RAM (GB)']) >= amount and row['GPUs'] and int(row['GPUs']) > 0:
             names.append(row['Hostname'])
     return names
 
@@ -107,27 +106,34 @@ def explode_name(name):
 # print(explode_name("optane01"))
 # print(explode_name("jaguar[01-04]"))
 # print(explode_name("ristretto[01,04]"))
+def explode_names(names):
+    new_names = []
+    for name in names:
+        new_names.extend(explode_name(name))
+    return new_names
 
-def compare_sinfo_webpage_data(webpage_data, gpu_names_sinfo):
-    webpage_names = []
-    for row in webpage_data:
-        if int(row['GPUs']) > 0:
-            webpage_names.append(row['Hostname'])
-    print('Webpage Names:', webpage_names)
+# def compare_sinfo_webpage_data(webpage_data, gpu_names_sinfo):
+#     webpage_names = []
+#     for row in webpage_data:
+#         if int(row['GPUs']) > 0:
+#             webpage_names.append(row['Hostname'])
+#     print('Webpage Names:', webpage_names)
 
-    exploded_webpage_names = []
-    for name in webpage_names:
-        exploded_webpage_names.extend(explode_name(name))
+#     exploded_webpage_names = []
+#     for name in webpage_names:
+#         exploded_webpage_names.extend(explode_name(name))
 
-    print('SINFO GPU Names:', gpu_names_sinfo)
-    exploded_sinfo_names = []
-    for name in gpu_names_sinfo:
-        exploded_sinfo_names.extend(explode_name(name))
+#     print('SINFO GPU Names:', gpu_names_sinfo)
+#     exploded_sinfo_names = []
+ 
 
-    print('Machine on webpage, missing from SINFO:', 
-        set(exploded_webpage_names)-set(exploded_sinfo_names))
-    print('Machine on SINFO, missing from WEBPAGE:',
-        set(exploded_sinfo_names)-set(exploded_webpage_names))
+#     print('Machine on webpage, missing from SINFO:', 
+#         set(exploded_webpage_names)-set(exploded_sinfo_names))
+#     print('Machine on SINFO, missing from WEBPAGE:',
+#         set(exploded_sinfo_names)-set(exploded_webpage_names))
+
+def build_exclude_set(orig_wanted_machines, sinfo_list):
+    return list(set(sinfo_list) - set(orig_wanted_machines))
 
 # sinfo -o "%N %P"
 def main():
@@ -137,10 +143,12 @@ def main():
     # write_compute_res_data_json(data)
 
     data = read_compute_res_data_json()
-    unwanted_machines = filter_gpu_mem(data, 30)
-    gpu_names_sinfo = get_gpu_names_sinfo()
-    compare_sinfo_webpage_data(data, gpu_names_sinfo)
-    print()
+    wanted_machines = explode_names(filter_gpu_mem(data, 30))
+    gpu_names_sinfo = explode_names(get_gpu_names_sinfo())
+    
+
+    #compare_sinfo_webpage_data(data, gpu_names_sinfo)
+    unwanted_machines = build_exclude_set(wanted_machines, gpu_names_sinfo)
     print(build_exclude_str(unwanted_machines))
 
 if __name__ == '__main__':
